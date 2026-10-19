@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: IncuBrix AI Background Music Engine - Prototype
+  description: A basic demonstration prototype of the IncuBrix AI Background Music Engine
+  version: 0.1.0
+paths:
+  /health:
+    get:
+      summary: Health Check
+      description: Health check endpoint to verify that the application is running.
+      operationId: health_check_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "ok"
+                  service:
+                    type: string
+                    example: "incubrix-ai-music-engine-prototype"
+                  version:
+                    type: string
+                    example: "0.1.0"
+                  provider:
+                    type: string
+                    example: "mock"
+                  timestamp:
+                    type: string
+                    format: date-time
+                required:
+                  - status
+                  - service
+                  - version
+                  - provider
+                  - timestamp
+
+  /api/v1/music/jobs:
+    post:
+      summary: Create Music Generation Job
+      description: Accepts a music prompt and duration (5 to 300 seconds), creates an asynchronous generation job, and queues it for processing.
+      operationId: create_music_job_api_v1_music_jobs_post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MusicJobCreate'
+      responses:
+        '202':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicJobResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/jobs/{job_id}:
+    get:
+      summary: Get Job Status and Results
+      description: Retrieves current job status, progress, and results or error details.
+      operationId: get_job_status_api_v1_jobs__job_id__get
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Job Id
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MusicJobResponse'
+        '404':
+          description: Job Not Found
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+
+  /api/v1/jobs/{job_id}/download/{filename}:
+    get:
+      summary: Download Job Artifact
+      description: Download the generated audio file (mix.wav) or manifest (music_manifest.json).
+      operationId: download_job_file_api_v1_jobs__job_id__download__filename__get
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Job Id
+        - name: filename
+          in: path
+          required: true
+          schema:
+            type: string
+            title: Filename
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            audio/wav:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: object
+        '404':
+          description: File Not Found
+
+  /:
+    get:
+      summary: Web Interface
+      description: Serves the simple web frontend.
+      operationId: serve_index__get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            text/html:
+              schema:
+                type: string
+
+components:
+  schemas:
+    MusicJobCreate:
+      type: object
+      required:
+        - prompt
+      properties:
+        prompt:
+          type: string
+          minLength: 3
+          maxLength: 1000
+          description: Text description of the desired background music
+          example: "warm, optimistic acoustic pop for a product launch"
+        duration_s:
+          type: number
+          description: Music duration in seconds (must be between 5.0 and 300.0)
+          example: 30.0
+        duration:
+          type: number
+          description: Alias for duration_s
+          example: 30.0
+
+    MusicJobResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - progress
+        - prompt
+        - duration_s
+        - created_at
+        - message
+      properties:
+        job_id:
+          type: string
+          example: "e6f9d342-99ab-4a5c-bb12-421710e2adcf"
+        status:
+          type: string
+          enum: [queued, running, succeeded, failed]
+          example: "succeeded"
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 100
+        prompt:
+          type: string
+          example: "warm, optimistic acoustic pop for a product launch"
+        duration_s:
+          type: number
+          example: 30.0
+        created_at:
+          type: string
+          format: date-time
+        message:
+          type: string
+          example: "Music generation succeeded"
+        result:
+          type: object
+          nullable: true
+          properties:
+            mix_url:
+              type: string
+              example: "/api/v1/jobs/e6f9d342-99ab-4a5c-bb12-421710e2adcf/download/mix.wav"
+            manifest_url:
+              type: string
+              example: "/api/v1/jobs/e6f9d342-99ab-4a5c-bb12-421710e2adcf/download/music_manifest.json"
+            manifest:
+              type: object
+        error:
+          type: string
+          nullable: true
+
+    HTTPValidationError:
+      type: object
+      properties:
+        detail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationError'
+
+    ValidationError:
+      type: object
+      required:
+        - loc
+        - msg
+        - type
+      properties:
+        loc:
+          type: array
+          items:
+            anyOf:
+              - type: string
+              - type: integer
+        msg:
+          type: string
+        type:
+          type: string
+        input: {}
+        ctx:
+          type: object
